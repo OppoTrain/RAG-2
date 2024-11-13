@@ -15,14 +15,22 @@ if st.button("Get Summary"):
     if user_query:
         with st.spinner("Generating summary..."):
             try:
-                # Make a synchronous request to FastAPI endpoint
-                response = httpx.post(API_URL, json={"query_text": user_query})
-                response.raise_for_status()
+                # Make a synchronous request to FastAPI endpoint with timeout
+                response = httpx.post(API_URL, json={"query_text": user_query}, timeout=30)
+                response.raise_for_status()  # Raises exception for 4xx/5xx responses
 
                 # Parse and display the response
                 summary = response.json().get("summary") or response.json().get("message")
-                st.write(summary)
-
+                if summary:
+                    st.subheader("Your Query:")
+                    st.write(user_query)  # Display the user's original query
+                    st.subheader("Generated Summary:")
+                    st.write(summary)  # Display the summary
+                else:
+                    st.warning("No summary returned from the model.")
+                    
+            except httpx.RequestError as e:
+                st.error(f"An error occurred while making the request: {str(e)}")
             except httpx.HTTPStatusError as e:
                 st.error(f"Error from API: {e.response.status_code} - {e.response.text}")
             except Exception as e:

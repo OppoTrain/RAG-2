@@ -5,8 +5,11 @@ import numpy as np
 
 summarization_prompt = """
 Summarize the following document based on the question in a structured format:
+Question: {question}
+Document: {document}
+
 Introduction about the topic question
-Conclusion : Summary of the document
+Conclusion: Summary of the document including the answer to the question
 """
 
 unknown_info_template = """
@@ -30,8 +33,7 @@ If you have other questions or topics you'd like to discuss, feel free to ask!
 """
 
 # Function to retrieve final results from ChromaDB
-
-def retrieve_final_results(client, collection_name, query_embedding, k, lambda_mult, similarity_threshold=0.7):
+def retrieve_final_results(client, collection_name, query_embedding, k, lambda_mult, similarity_threshold=0.55):
     # Retrieve the collection
     collection = client.get_collection(name=collection_name)
 
@@ -45,47 +47,50 @@ def retrieve_final_results(client, collection_name, query_embedding, k, lambda_m
     return final_results
 
 # Function to summarize the document using the Together client
-def summarize_with_together_api(tg_client, question, document, max_tokens=4097):
-    # Prepare prompt from the summarization template
+def summarize_with_together_api(tg_client, question, document):
+    # Prepare the prompt from the summarization template
     prompt = summarization_prompt.format(question=question, document=document)
 
-    # Calculate the token limit for the document after accounting for the prompt overhead
-    prompt_tokens = tokenizer.encode(prompt, return_tensors="pt")
-    max_document_tokens = max_tokens - len(prompt_tokens[0]) - 1  # Reserve room for response tokens
+    # Send the request to Together's API
+    response = tg_client.chat.completions.create(
+        model="meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=None,
+        temperature=0.7,
+        top_p=0.7,
+        top_k=50,
+        repetition_penalty=1,
+        stop=["<|eot_id|>", "<|eom_id|>"],
+        stream=True
+    )
 
-    # Truncate document if necessary
-    document_tokens = tokenizer.encode(document, return_tensors="pt")
-    if len(document_tokens[0]) > max_document_tokens:
-        truncated_document = tokenizer.decode(document_tokens[0][:max_document_tokens])
-        prompt = summarization_prompt.format(question=question, document=truncated_document)
-
+    # Collect streamed tokens to form the final summary
+    summary_tokens = []
     try:
-        # API call with the prompt
-        response = tg_client.chat.completions.create(
-            model="Gryphe/MythoMax-L2-13b-Lite",
-            messages=[{"role": "user", "content": prompt}]
-        )
-
-        # Return the summary if response is valid
-        if response and response.choices:
-            return response.choices[0].message.content.strip()
-        else:
-            return "No summary available from the model."
-
+        for token in response:
+            # Check for 'choices' and 'delta' attributes
+            if hasattr(token, 'choices') and token.choices and hasattr(token.choices[0], 'delta'):
+                delta_content = token.choices[0].delta.content
+                if delta_content:  # Ensure content is not None or empty
+                    summary_tokens.append(delta_content)
+        # Join all tokens to form the complete summary
+        summary = ''.join(summary_tokens)
     except Exception as e:
-        return f"Error while calling the Together API: {str(e)}"
+        print(f"An error occurred during streaming: {e}")
+        summary = "Error: Failed to complete summarization."
+
+    return summary
 
 # Function to summarize documents
-def summarize_documents(tg_client, question, documents, max_tokens=4097):
+def summarize_documents(tg_client, question, documents):
     if not documents:
         return None
 
     # Concatenate all documents into one string
     merged_document = " ".join(documents)
-
     # Summarize the merged document
-    summary = summarize_with_together_api(tg_client, question, merged_document, max_tokens=max_tokens)
-
+    summary = summarize_with_together_api(tg_client, question, merged_document)
+    print(summary)
     return summary if summary else "No summary available for the provided documents."
 
 # Function to display summarized results
@@ -96,10 +101,10 @@ def display_summarized_results(client, tg_client, collection_name, query_text, k
     # Retrieve results
     final_results = retrieve_final_results(client, collection_name, query_embedding, k, lambda_mult)
     # Generate summaries for the provided documents
-    summaries = summarize_documents(tg_client, query_text, [doc[0] for doc in final_results],max_tokens=4097)
+    summaries = summarize_documents(tg_client, query_text, [doc[0] for doc in final_results])
     # Check if any summaries were generated
     if not summaries:
         # Print the unknown information template if no documents are provided or no summaries are generated
-        return(unknown_info_template)
+        return unknown_info_template
     else:
-       return(summaries)
+        return summaries
