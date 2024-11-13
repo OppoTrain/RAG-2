@@ -2,29 +2,19 @@ services:
   fastapi:
     build:
       context: .
-      dockerfile: Dockerfile.fastapi
-    container_name: fastapi_service
+      dockerfile: app/Dockerfile
+    container_name: fastapi
     ports:
       - "8000:8000"
     volumes:
-      - .:/app       
-    networks:
-      - app-network
+      - .:/app
 
   streamlit:
     build:
       context: .
-      dockerfile: Dockerfile.streamlit
-    container_name: streamlit_service
+      dockerfile: frontend/Dockerfile
+    container_name: streamlit
     ports:
       - "8501:8501"
-    depends_on:
-      - fastapi
     volumes:
-      - .:/app      
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
+      - .:/frontend
