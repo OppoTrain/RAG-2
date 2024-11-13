@@ -2,13 +2,12 @@ fastapi
 uvicorn
 requests
 langchain-community
-beautifulsoup4
 langchain
 chromadb
 sentence-transformers
 together
 scikit-learn
 numpy
-gensim
 transformers
 firebase-admin
+streamlit

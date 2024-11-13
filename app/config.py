@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 import os
 from together import Together
 from transformers import GPT2Tokenizer
-from langchain_community.embeddings import HuggingFaceEmbeddings  # Updated import
+from langchain_community.embeddings import HuggingFaceEmbeddings  
 import chromadb
 
 load_dotenv()
