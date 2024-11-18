@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+requests
+langchain-community
+langchain
+chromadb
+sentence-transformers
+together
+scikit-learn
+numpy
+transformers
+firebase-admin
+streamlit
