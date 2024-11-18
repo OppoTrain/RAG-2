@@ -1,7 +1,7 @@
 import streamlit as st
 import httpx
 
-API_URL = "http://fastapi:8000/summarize"
+API_URL = "http://127.0.0.1:8000/summarize"
 
 st.title("RAG Model Chatbot")
 st.write("Enter a query, and our RAG model will generate a summary for you.")

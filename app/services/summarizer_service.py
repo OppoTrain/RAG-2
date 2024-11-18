@@ -1,8 +1,29 @@
 from app.config import hf_embedding_function, tokenizer, client, together_client
 from app.services.chroma_service import initial_query
-from app.services.similarity_service import filter_by_similarity, apply_mmr
+from app.services.similarity_service import filter_by_similarity, apply_mmr ,calculate_cosine_similarity
 import numpy as np
+conversation_data = {
+    "hello": "Hi there! How can I assist you today?",
+    "how are you": "I'm just a program, but I'm here to help you!",
+    "what is your name": "I'm your friendly assistant!",
+    "goodbye": "Goodbye! Have a great day!"
+}
+predefined_questions = list(conversation_data.keys())
+predefined_embeddings = []
+for question in predefined_questions:
+    embedding = hf_embedding_function.embed_query(question)
+    predefined_embeddings.append(embedding)
+    
+# Cosine Similarity Function
+def find_best_match(user_input, embeddings, threshold=0.55):
+    user_embedding = np.array(hf_embedding_function.embed_query(user_input)).reshape(1, -1)
+    similarities = calculate_cosine_similarity(user_embedding, embeddings).flatten()
+    best_match_index = np.argmax(similarities)
+    if similarities[best_match_index] >= threshold:
+        return predefined_questions[best_match_index]
+    return None
 
+    
 summarization_prompt = """
 Summarize the following document based on the question in a structured format:
 Question: {question}
@@ -95,16 +116,26 @@ def summarize_documents(tg_client, question, documents):
 
 # Function to display summarized results
 def display_summarized_results(client, tg_client, collection_name, query_text, k, lambda_mult):
+
+    best_match = find_best_match(query_text, predefined_embeddings, threshold=0.55)
+    
+    if best_match:
+        # If a predefined response exists, return it
+        return conversation_data[best_match] 
+        
     # Prepare the query embedding
     query_embedding = hf_embedding_function.embed_query(query_text)
     query_embedding = np.array(query_embedding).flatten()  # Ensure 1D array
+
     # Retrieve results
     final_results = retrieve_final_results(client, collection_name, query_embedding, k, lambda_mult)
+    
     # Generate summaries for the provided documents
-    summaries = summarize_documents(tg_client, query_text, [doc[0] for doc in final_results])
+    summaries = summarize_documents(tg_client, query_text, [doc[0] for doc in final_results],max_tokens=4097)
+
     # Check if any summaries were generated
     if not summaries:
         # Print the unknown information template if no documents are provided or no summaries are generated
-        return unknown_info_template
+        print(unknown_info_template)
     else:
-        return summaries
+       print(summaries)
