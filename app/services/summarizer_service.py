@@ -33,7 +33,7 @@ If you have other questions or topics you'd like to discuss, feel free to ask!
 """
 
 # Function to retrieve final results from ChromaDB
-def retrieve_final_results(client, collection_name, query_embedding, k, lambda_mult, similarity_threshold=0.55):
+def retrieve_final_results(client, collection_name, query_embedding, k, lambda_mult, similarity_threshold=0.65):
     # Retrieve the collection
     collection = client.get_collection(name=collection_name)
 
