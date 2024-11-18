@@ -114,28 +114,22 @@ def summarize_documents(tg_client, question, documents):
     print(summary)
     return summary if summary else "No summary available for the provided documents."
 
-# Function to display summarized results
 def display_summarized_results(client, tg_client, collection_name, query_text, k, lambda_mult):
-
+    # Prepare the query embedding
     best_match = find_best_match(query_text, predefined_embeddings, threshold=0.55)
-    
     if best_match:
         # If a predefined response exists, return it
-        return conversation_data[best_match] 
-        
-    # Prepare the query embedding
+        return conversation_data[best_match]     
+    
     query_embedding = hf_embedding_function.embed_query(query_text)
     query_embedding = np.array(query_embedding).flatten()  # Ensure 1D array
-
     # Retrieve results
     final_results = retrieve_final_results(client, collection_name, query_embedding, k, lambda_mult)
-    
     # Generate summaries for the provided documents
-    summaries = summarize_documents(tg_client, query_text, [doc[0] for doc in final_results],max_tokens=4097)
-
+    summaries = summarize_documents(tg_client, query_text, [doc[0] for doc in final_results])
     # Check if any summaries were generated
     if not summaries:
         # Print the unknown information template if no documents are provided or no summaries are generated
-        print(unknown_info_template)
+        return unknown_info_template
     else:
-       print(summaries)
+        return summaries
