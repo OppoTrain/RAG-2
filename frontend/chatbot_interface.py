@@ -17,32 +17,36 @@ from services.summarizer_service import summarize_with_together_api
 def handle_file_upload_with_chroma(uploaded_file, together_client):
     """Process the uploaded file (PDF only), add its content to Chroma, and summarize it."""
     if uploaded_file is not None:
+        # Ensure only one file is uploaded and processed at a time
+        if "file_processed" in st.session_state and st.session_state["file_processed"]:
+            st.warning("File already processed. Please ask a question or upload a new file.")
+            return
+        
         with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_file.name.split('.')[-1]}") as tmp_file:
             tmp_file.write(uploaded_file.read())
             file_path = tmp_file.name
 
-        # Handle file types
         try:
             with st.spinner(f"Processing {uploaded_file.name}..."):
-                # Handle PDF using the backend service
                 if uploaded_file.name.endswith('.pdf'):
                     # Extract the text content from the PDF
-                    document_text = read_pdf(file_path)  
+                    document_text = read_pdf(file_path)
 
                     # Generate the embedding for the document content
                     document_embedding = hf_embedding_function.embed_query(document_text)
 
                     # Add document and its embedding to Chroma
-                    collection = client.get_or_create_collection(name="user_file")  
-                    collection.add(documents=[document_text], embeddings=[document_embedding],ids=file_path)
+                    collection = client.get_or_create_collection(name="user_file")
+                    collection.add(documents=[document_text], embeddings=[document_embedding], ids=file_path)
 
-                    # Now summarize the document
+                    # Summarize the document
                     summary = summarize_with_together_api(together_client, "Summarize this document:", document_text)
                     
                     if summary:
                         st.success(f"Summary of {uploaded_file.name}: {summary}")
                         # Store the summary in session state for future use
                         st.session_state.file_summary = summary
+                        st.session_state["file_processed"] = True  # Mark the file as processed
                     else:
                         st.error("Error generating summary.")
                 else:
@@ -50,7 +54,7 @@ def handle_file_upload_with_chroma(uploaded_file, together_client):
         except Exception as e:
             st.error(f"Error processing the file: {e}")
             st.error(traceback.format_exc())
-
+            
 # API URL for chat summarization
 API_URL = "http://127.0.0.1:8000/summarize"
 
@@ -116,15 +120,20 @@ if "file_summary" in st.session_state:
 def handle_user_input():
     """Process user input and generate a bot response."""
     user_query = st.session_state.user_input.strip()
+    
     if user_query:  # Ensure the input is not empty
         # Append user query to chat history
         st.session_state.messages.append({"role": "user", "content": user_query})
 
         # Check if there was a file uploaded and processed
-        if "file_summary" in st.session_state:
+        if "file_summary" in st.session_state and not st.session_state.get("file_summary_shown", False):
+            # Append the file summary to the chat history
             st.session_state.messages.append({"role": "assistant", "content": f"Here is the summary of your uploaded file: {st.session_state['file_summary']}"})
+            
+            # Mark the summary as shown, so it won't be shown again in the future
+            st.session_state["file_summary_shown"] = True
 
-        # Generate bot response
+        # Generate bot response based on the current user query
         with st.spinner("Kuki is thinking..."):
             try:
                 response = httpx.post(API_URL, json={"query_text": user_query}, timeout=30)
@@ -139,10 +148,11 @@ def handle_user_input():
                 st.session_state.messages.append({"role": "assistant", "content": f"An error occurred: {str(e)}"})
                 st.error(traceback.format_exc())
 
-        # Clear the user input field
-        st.session_state.user_input = ""
+        # Now clear the user input after processing
+        st.session_state.user_input = ""  # Reset the user input field only after processing the query
 
-# Render chat messages
+
+# Render the chat messages
 st.markdown('<div class="chat-container">', unsafe_allow_html=True)
 for message in st.session_state.messages:
     if message["role"] == "assistant":
@@ -175,8 +185,8 @@ st.text_input(
     on_change=handle_user_input,  # Triggered when user presses Enter
 )
 
-# File upload option for PDF only
-uploaded_file = st.file_uploader("Upload a PDF file", type=["pdf"])
+# File upload option for PDF only, with unique keys for each uploader
+uploaded_pdf = st.file_uploader("Upload a PDF file", type=["pdf"], key="pdf_uploader_1")
 
-if uploaded_file:
-    handle_file_upload_with_chroma(uploaded_file,together_client)
+if uploaded_pdf:
+    handle_file_upload_with_chroma(uploaded_pdf, together_client)
