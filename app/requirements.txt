@@ -10,5 +10,3 @@ scikit-learn
 numpy
 transformers
 firebase-admin
-streamlit
-PyPDF2

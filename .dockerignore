@@ -1,3 +1,30 @@
+# Python cache files
+*.pyc
+*.pyo
+app/services/__pycache__
+app/routes/__pycache__
+# Environment variables
 .env
-fastapi-env/
+
+# Git-related files
+.git
+.gitignore
+
+# System files
+.DS_Store
+Thumbs.db
+chromadb
+
+# Virtual environment
+venv/
+env/
 __pycache__
+
+*.log
+*.sqlite3
+
+# Local development files
+*.swp
+*.swo
+.idea/
+.vscode/

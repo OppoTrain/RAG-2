@@ -1,4 +1,4 @@
-from app.config import hf_embedding_function, tokenizer, client, together_client
+from app.config import hf_embedding_function
 from app.services.chroma_service import initial_query
 from app.services.similarity_service import filter_by_similarity, apply_mmr ,calculate_cosine_similarity
 import numpy as np

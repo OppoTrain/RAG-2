@@ -108,7 +108,6 @@ for message in st.session_state.messages:
         )
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Input field with on_change callback
 st.text_input(
     "Type your message:",
     value=st.session_state.user_input,

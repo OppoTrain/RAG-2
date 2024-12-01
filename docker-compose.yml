@@ -1,20 +1,20 @@
+version: "3.9"
 services:
-  fastapi:
+  backend:
     build:
       context: .
-      dockerfile: app/Dockerfile
-    container_name: fastapi
+      dockerfile: Dockerfile
+      target: backend
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
-
-  streamlit:
+      - ./app:/app
+  frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
-    container_name: streamlit
+      dockerfile: Dockerfile
+      target: frontend
     ports:
       - "8501:8501"
     volumes:
-      - .:/frontend
+      - ./frontend:/frontend
