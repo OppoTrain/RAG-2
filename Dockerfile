@@ -1,5 +1,3 @@
-# Use a multi-stage build
-# Stage 1: Build the backend (FastAPI)
 FROM python:3.9-slim as backend
 
 # Set working directory for the backend
