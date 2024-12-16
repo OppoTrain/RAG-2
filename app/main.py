@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routes.summarize import router as summarize_router
+from routes.summarize import router as summarize_router
 
 app = FastAPI()
 

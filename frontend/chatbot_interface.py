@@ -2,7 +2,7 @@ import streamlit as st
 import httpx
 
 # API URL for chat summarization
-API_URL = "http://127.0.0.1:8000/summarize"
+API_URL = "http://localhost:8000/summarize"
 
 # Chat container styling
 st.markdown(

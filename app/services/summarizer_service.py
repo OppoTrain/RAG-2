@@ -1,7 +1,10 @@
-from app.config import hf_embedding_function
-from app.services.chroma_service import initial_query
-from app.services.similarity_service import filter_by_similarity, apply_mmr ,calculate_cosine_similarity
+from config import hf_embedding_function
+from services.chroma_service import initial_query
+from services.similarity_service import filter_by_similarity, apply_mmr, calculate_cosine_similarity
 import numpy as np
+import boto3
+import json
+
 conversation_data = {
     "hello": "Hi there! How can I assist you today?",
     "how are you": "I'm just a program, but I'm here to help you!",
@@ -13,7 +16,7 @@ predefined_embeddings = []
 for question in predefined_questions:
     embedding = hf_embedding_function.embed_query(question)
     predefined_embeddings.append(embedding)
-    
+
 # Cosine Similarity Function
 def find_best_match(user_input, embeddings, threshold=0.55):
     user_embedding = np.array(hf_embedding_function.embed_query(user_input)).reshape(1, -1)
@@ -23,7 +26,6 @@ def find_best_match(user_input, embeddings, threshold=0.55):
         return predefined_questions[best_match_index]
     return None
 
-    
 summarization_prompt = """
 Summarize the following document based on the question in a structured format:
 Question: {question}
@@ -53,16 +55,34 @@ Thank you for your question! However, it appears that the information you've pro
 If you have other questions or topics you'd like to discuss, feel free to ask!
 """
 
-# Function to retrieve final results from ChromaDB
-def retrieve_final_results(client, collection_name, query_embedding, k, lambda_mult, similarity_threshold=0.65):
-    # Retrieve the collection
-    collection = client.get_collection(name=collection_name)
+def retrieve_final_results_s3(s3_bucket, prefix, query_embedding, k, lambda_mult, similarity_threshold=0.65):
+    # Initialize S3 client
+    s3_client = boto3.client("s3")
 
-    # Execute the initial query
-    initial_results_documents, initial_results_embeddings = initial_query(collection, query_embedding, k)
-    # Filter the results based on similarity
-    filtered_results = filter_by_similarity(initial_results_documents, initial_results_embeddings, query_embedding, similarity_threshold)
-    # Apply MMR for diversity
+    # List all objects in the given S3 prefix
+    response = s3_client.list_objects_v2(Bucket=s3_bucket, Prefix=prefix)
+
+    if 'Contents' not in response:
+        raise ValueError(f"No files found in the S3 bucket '{s3_bucket}' with prefix '{prefix}'.")
+
+    # Fetch all document files
+    documents = []
+    embeddings = []
+
+    for obj in response['Contents']:
+        # Get the object content
+        file_key = obj['Key']
+        file_content = s3_client.get_object(Bucket=s3_bucket, Key=file_key)['Body'].read().decode("utf-8")
+
+        # Assume JSON format for documents and embeddings
+        file_data = json.loads(file_content)
+        documents.append(file_data['document'])
+        embeddings.append(np.array(file_data['embedding']))  # Ensure embedding is a NumPy array
+
+    # Filter documents by similarity
+    filtered_results = filter_by_similarity(documents, embeddings, query_embedding, similarity_threshold)
+
+    # Apply MMR for diverse results
     final_results = apply_mmr(filtered_results, query_embedding, k, lambda_mult)
 
     return final_results
@@ -114,17 +134,17 @@ def summarize_documents(tg_client, question, documents):
     print(summary)
     return summary if summary else "No summary available for the provided documents."
 
-def display_summarized_results(client, tg_client, collection_name, query_text, k, lambda_mult):
+def display_summarized_results(s3_bucket, prefix, tg_client, query_text, k, lambda_mult):
     # Prepare the query embedding
     best_match = find_best_match(query_text, predefined_embeddings, threshold=0.55)
     if best_match:
         # If a predefined response exists, return it
         return conversation_data[best_match]     
-    
+
     query_embedding = hf_embedding_function.embed_query(query_text)
     query_embedding = np.array(query_embedding).flatten()  # Ensure 1D array
     # Retrieve results
-    final_results = retrieve_final_results(client, collection_name, query_embedding, k, lambda_mult)
+    final_results = retrieve_final_results_s3(s3_bucket, prefix, query_embedding, k, lambda_mult)
     # Generate summaries for the provided documents
     summaries = summarize_documents(tg_client, query_text, [doc[0] for doc in final_results])
     # Check if any summaries were generated

@@ -4,7 +4,6 @@
 app/services/__pycache__
 app/routes/__pycache__
 # Environment variables
-.env
 
 # Git-related files
 .git
